@@ -350,7 +350,7 @@ public class ConditionalStartEventTest {
    * Tests the case, when no new subscription is needed, as it is not the latest version, that is being deleted.
    */
   @Test
-  @Ignore("CAM-8666")
+//  @Ignore("CAM-8666")
   public void testDeleteNotLatestVersion() {
     String definitionId1 = deployProcess(SINGLE_CONDITIONAL_XML);
     String definitionId2 = deployProcess(SINGLE_CONDITIONAL_XML);
