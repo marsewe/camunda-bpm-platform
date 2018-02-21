@@ -125,6 +125,10 @@ public class PvmAtomicOperationTransitionDestroyScope implements PvmAtomicOperat
       // actually be started in correct order :) )
       Collections.reverse(outgoingExecutions);
 
+//      for (OutgoingExecution outgoingExecution : outgoingExecutions) {
+//        outgoingExecution.getOutgoingExecution().setActivityInstanceId(null);
+//      }
+
       for (OutgoingExecution outgoingExecution : outgoingExecutions) {
         outgoingExecution.take();
       }
