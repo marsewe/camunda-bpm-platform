@@ -5,13 +5,11 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 /**
  * @author Svetlana Dorokhova.
  */
-@JsonDeserialize(contentAs = RegularCustomer.class)
-public class ObjectList<T> implements List<Object> {
+public class ObjectList implements List<Object> {
 
   protected List<Object> innerList = new ArrayList<Object>();
 

@@ -1,4 +1,4 @@
-package org.camunda.bpm.qa.upgrade.scenarios780;
+package org.camunda.bpm.qa.upgrade.scenarios790;
 
 import java.util.List;
 import org.camunda.bpm.engine.history.HistoricVariableInstance;
@@ -23,7 +23,7 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 @ScenarioUnderTest("CreateProcessInstanceWithJsonVariablesScenario")
-@Origin("7.8.0")
+@Origin("7.9.0")
 public class CreateProcessInstanceWithJsonVariablesTest {
 
   @Rule

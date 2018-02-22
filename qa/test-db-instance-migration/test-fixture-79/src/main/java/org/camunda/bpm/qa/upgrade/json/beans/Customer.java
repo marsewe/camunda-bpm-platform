@@ -12,7 +12,9 @@
  */
 package org.camunda.bpm.qa.upgrade.json.beans;
 
-public class EmptyBean {
+public interface Customer {
 
-  // that is all
+  String getName();
+
+  int getContractStartDate();
 }

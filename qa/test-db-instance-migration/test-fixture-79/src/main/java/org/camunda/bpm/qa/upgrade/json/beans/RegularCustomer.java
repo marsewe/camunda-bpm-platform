@@ -12,17 +12,31 @@
  */
 package org.camunda.bpm.qa.upgrade.json.beans;
 
-import java.util.Date;
 
-public class DateObject {
+public class RegularCustomer implements Customer {
 
-  private Date date;
+  private String name;
+  private int contractStartDate;
 
-  public Date getDate() {
-    return date;
+  public RegularCustomer() {
   }
 
-  public void setDate(Date date) {
-    this.date = date;
+  public RegularCustomer(String name, int contractStartDate) {
+    this.name = name;
+    this.contractStartDate = contractStartDate;
   }
+
+  public String getName() {
+    return name;
+  }
+  public void setName(String name) {
+    this.name = name;
+  }
+  public int getContractStartDate() {
+    return contractStartDate;
+  }
+  public void setContractStartDate(int contractStartDate) {
+    this.contractStartDate = contractStartDate;
+  }
+
 }
