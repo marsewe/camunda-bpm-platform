@@ -3,6 +3,7 @@
   <artifactId>camunda-jobexecutor-ra</artifactId>
   <packaging>jar</packaging>
   <name>camunda BPM - Job Executor RA</name>
+  <groupId>org.camunda.bpm.javaee</groupId>
 
   <parent>
     <groupId>org.camunda.bpm</groupId>
@@ -46,5 +47,24 @@
 
   </dependencies>
 
-  <groupId>org.camunda.bpm.javaee</groupId>
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>license-maven-plugin</artifactId>
+          <version>1.14</version>
+          <executions>
+            <execution>
+              <id>license-management</id>
+              <goals>
+                <goal>add-third-party</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+
 </project>
