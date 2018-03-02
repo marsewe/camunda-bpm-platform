@@ -126,7 +126,6 @@ public class DeploymentHelper {
 
   public static JavaArchive[] getJodaTimeModuleForServer(String server) {
     if (server.equals("tomcat") ||
-        server.equals("websphere") ||
         server.equals("websphere9") ||
         server.equals("weblogic") ||
         server.equals("glassfish")) {
@@ -137,6 +136,14 @@ public class DeploymentHelper {
           .using(new RejectDependenciesStrategy(false,
               "joda-time:joda-time"))
           .as(JavaArchive.class);
+    } else if (server.equals("websphere")) {
+      return Maven.configureResolver()
+        .workOffline()
+        .loadPomFromFile("pom.xml", "was80")
+        .resolve("com.fasterxml.jackson.datatype:jackson-datatype-joda")
+        .using(new RejectDependenciesStrategy(false,
+          "joda-time:joda-time"))
+        .as(JavaArchive.class);
     } else if (server.equals("jboss")) {
       return Maven.configureResolver()
           .workOffline()
