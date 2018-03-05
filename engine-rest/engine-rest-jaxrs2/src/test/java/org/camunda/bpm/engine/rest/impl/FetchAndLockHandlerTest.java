@@ -211,7 +211,7 @@ public class FetchAndLockHandlerTest {
 
     // when
     ClockUtil.setCurrentTime(new Date(ClockUtil.getCurrentTime().getTime() + 1000L));
-    long backOffTime = fetchAndLockHandler.checkPendingRequests();
+    long backOffTime = fetchAndLockHandler.acquire();
 
     // then
     verifyNoMoreInteractions(asyncResponse);
@@ -245,7 +245,7 @@ public class FetchAndLockHandlerTest {
 
     // when
     ClockUtil.setCurrentTime(new Date(ClockUtil.getCurrentTime().getTime() + 1000L));
-    long backOffTime = fetchAndLockHandler.checkPendingRequests();
+    long backOffTime = fetchAndLockHandler.acquire();
 
     // then
     verify(asyncResponse1).resume(anyList());
@@ -271,7 +271,7 @@ public class FetchAndLockHandlerTest {
 
     // when
     ClockUtil.setCurrentTime(new Date(ClockUtil.getCurrentTime().getTime() + 1000L));
-    long backOffTime = fetchAndLockHandler.checkPendingRequests();
+    long backOffTime = fetchAndLockHandler.acquire();
 
     // then
     ArgumentCaptor<ProcessEngineException> argumentCaptor = ArgumentCaptor.forClass(ProcessEngineException.class);
@@ -294,7 +294,7 @@ public class FetchAndLockHandlerTest {
 
     // when
     ClockUtil.setCurrentTime(new Date(ClockUtil.getCurrentTime().getTime() + 1000L));
-    long backOffTime = fetchAndLockHandler.checkPendingRequests();
+    long backOffTime = fetchAndLockHandler.acquire();
 
     // then
     verify(asyncResponse, times(1)).resume(Collections.emptyList());

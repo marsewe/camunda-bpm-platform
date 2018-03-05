@@ -12,6 +12,14 @@
  */
 package org.camunda.bpm.engine.rest.impl;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+
+import javax.ws.rs.container.AsyncResponse;
+import javax.ws.rs.core.Response.Status;
+
 import org.camunda.bpm.engine.IdentityService;
 import org.camunda.bpm.engine.ProcessEngine;
 import org.camunda.bpm.engine.ProcessEngineException;
@@ -25,12 +33,6 @@ import org.camunda.bpm.engine.rest.dto.externaltask.LockedExternalTaskDto;
 import org.camunda.bpm.engine.rest.exception.InvalidRequestException;
 import org.camunda.bpm.engine.rest.spi.FetchAndLockHandler;
 
-import javax.ws.rs.container.AsyncResponse;
-import javax.ws.rs.core.Response.Status;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 /**
  * @author Tassilo Weidner
  */
@@ -39,18 +41,20 @@ public class FetchAndLockHandlerImpl implements Runnable, FetchAndLockHandler {
   private static final long MAX_BACK_OFF_TIME = Long.MAX_VALUE;
   public static final long MAX_TIMEOUT = 1800000; // 30 minutes
 
-  private List<FetchAndLockRequest> pendingRequests = new CopyOnWriteArrayList<FetchAndLockRequest>();
+  // TODO: Is it somehow possible to make the queue capacity configurable? 
+  private BlockingQueue<FetchAndLockRequest> queue = new ArrayBlockingQueue<FetchAndLockRequest>(100);
+  private List<FetchAndLockRequest> pendingRequests = new ArrayList<FetchAndLockRequest>();
 
-  private AtomicBoolean isWaiting = new AtomicBoolean(false);
   private final Object MONITOR = new Object();
   private Thread handlerThread = new Thread(this, this.getClass().getSimpleName());
+
+  private boolean isWaiting = false;
   private boolean isRunning = false;
 
   @Override
   public void run() {
     while (isRunning) {
-      long backoffTime = checkPendingRequests();
-      suspend(backoffTime);
+      acquire();
     }
 
     for (FetchAndLockRequest pendingRequest: pendingRequests) {
@@ -58,7 +62,10 @@ public class FetchAndLockHandlerImpl implements Runnable, FetchAndLockHandler {
     }
   }
 
-  protected long checkPendingRequests() {
+  protected void acquire() {
+
+    queue.drainTo(pendingRequests);
+
     long backoffTime = MAX_BACK_OFF_TIME;
     long start = ClockUtil.getCurrentTime().getTime();
 
@@ -93,7 +100,7 @@ public class FetchAndLockHandlerImpl implements Runnable, FetchAndLockHandler {
     }
 
     backoffTime = Math.max(0, (start + backoffTime) - ClockUtil.getCurrentTime().getTime());
-    return backoffTime;
+    suspend(backoffTime);
   }
 
   @Override
@@ -110,33 +117,41 @@ public class FetchAndLockHandlerImpl implements Runnable, FetchAndLockHandler {
   public void shutdown() {
     synchronized (MONITOR) {
       isRunning = false;
-      if(isWaiting.compareAndSet(true, false)) {
+      if(isWaiting) {
         MONITOR.notifyAll();
       }
     }
   }
 
   private void suspend(long millis) {
-    if (millis <= 0) {
+    if (millis <= 0 || !queue.isEmpty()) {
       return;
     }
 
     try {
+
       synchronized (MONITOR) {
-        isWaiting.set(true);
-        MONITOR.wait(millis);
+        if (queue.isEmpty()) {
+          isWaiting = true;
+          MONITOR.wait(millis);
+        }
       }
+
     }
     catch (InterruptedException ignore) {}
     finally {
-      isWaiting.set(false);
+      isWaiting = false;
     }
   }
 
   private void addRequest(FetchAndLockRequest request) {
-    pendingRequests.add(request);
-    if (isWaiting.compareAndSet(true, false)) {
-      synchronized (MONITOR) {
+    // TODO: what happens when the queue is full?
+    while (!queue.offer(request)) {
+      // noop;
+    }
+
+    synchronized (MONITOR) {
+      if (isWaiting) {
         MONITOR.notifyAll();
       }
     }
