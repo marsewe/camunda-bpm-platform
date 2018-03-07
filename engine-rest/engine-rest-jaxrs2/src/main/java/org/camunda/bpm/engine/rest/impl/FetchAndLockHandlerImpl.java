@@ -13,9 +13,12 @@
 package org.camunda.bpm.engine.rest.impl;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Semaphore;
 
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.core.Response.Status;
@@ -37,19 +40,19 @@ import org.camunda.bpm.engine.rest.spi.FetchAndLockHandler;
  * @author Tassilo Weidner
  */
 public class FetchAndLockHandlerImpl implements Runnable, FetchAndLockHandler {
-
-  private static final long MAX_BACK_OFF_TIME = Long.MAX_VALUE;
-  public static final long MAX_TIMEOUT = 1800000; // 30 minutes
+  
+  protected static final long MAX_BACK_OFF_TIME = Long.MAX_VALUE;
+  protected static final long MAX_TIMEOUT = 1800000; // 30 minutes
 
   // TODO: Is it somehow possible to make the queue capacity configurable? 
-  private BlockingQueue<FetchAndLockRequest> queue = new ArrayBlockingQueue<FetchAndLockRequest>(100);
-  private List<FetchAndLockRequest> pendingRequests = new ArrayList<FetchAndLockRequest>();
+  protected BlockingQueue<FetchAndLockRequest> queue = new ArrayBlockingQueue<FetchAndLockRequest>(100);
+  protected List<FetchAndLockRequest> pendingRequests = new ArrayList<FetchAndLockRequest>();
 
-  private final Object MONITOR = new Object();
-  private Thread handlerThread = new Thread(this, this.getClass().getSimpleName());
+  protected final Object MONITOR = new Object();
+  protected Thread handlerThread = new Thread(this, this.getClass().getSimpleName());
 
-  private boolean isWaiting = false;
-  private boolean isRunning = false;
+  protected boolean isWaiting = false;
+  protected boolean isRunning = false;
 
   @Override
   public void run() {
@@ -57,20 +60,25 @@ public class FetchAndLockHandlerImpl implements Runnable, FetchAndLockHandler {
       acquire();
     }
 
-    for (FetchAndLockRequest pendingRequest: pendingRequests) {
+    System.out.println("shutdown");
+    for (FetchAndLockRequest pendingRequest : pendingRequests) {
       invalidRequest(pendingRequest.getAsyncResponse(), "Request rejected due to shutdown of application server.");
     }
   }
 
   protected void acquire() {
 
+    System.out.println("acquire queue " + queue.size());
     queue.drainTo(pendingRequests);
+    System.out.println("acquire pending " + pendingRequests.size());
 
     long backoffTime = MAX_BACK_OFF_TIME;
     long start = ClockUtil.getCurrentTime().getTime();
+    
+    Iterator<FetchAndLockRequest> iterator = pendingRequests.iterator();
+    while(iterator.hasNext()) {
 
-    for (FetchAndLockRequest pendingRequest : pendingRequests) {
-
+      FetchAndLockRequest pendingRequest = iterator.next();
       FetchAndLockResult result = tryFetchAndLock(pendingRequest);
 
       if (result.wasSuccessful()) {
@@ -86,7 +94,7 @@ public class FetchAndLockHandlerImpl implements Runnable, FetchAndLockHandler {
 
         if (!lockedTasks.isEmpty() || timeout <= currentTime) {
           AsyncResponse asyncResponse = pendingRequest.getAsyncResponse();
-          pendingRequests.remove(pendingRequest);
+          iterator.remove();
           asyncResponse.resume(lockedTasks);
         } else {
           long slackTime = timeout - currentTime;
@@ -123,17 +131,32 @@ public class FetchAndLockHandlerImpl implements Runnable, FetchAndLockHandler {
     }
   }
 
-  private void suspend(long millis) {
-    if (millis <= 0 || !queue.isEmpty()) {
+  protected void suspend(long millis) {
+    System.out.println("suspend (0) " +  millis);
+    if (millis <= 0) {
       return;
     }
-
+    
+    if (!queue.isEmpty()) {
+      System.out.println("suspend queue (1)");
+      return;
+    }
+    
+    suspendAcquisition(millis);
+  }
+  
+  protected void suspendAcquisition(long millis) {
     try {
-
       synchronized (MONITOR) {
         if (queue.isEmpty()) {
+          System.out.println("pendingRequests " + pendingRequests.size());
+          System.out.println("wait " + millis);
           isWaiting = true;
           MONITOR.wait(millis);
+          System.out.println("leave wait");
+        }
+        else {
+          System.out.println("suspend queue (2)");
         }
       }
 
@@ -144,20 +167,26 @@ public class FetchAndLockHandlerImpl implements Runnable, FetchAndLockHandler {
     }
   }
 
-  private void addRequest(FetchAndLockRequest request) {
+  protected void addRequest(FetchAndLockRequest request) {
     // TODO: what happens when the queue is full?
     while (!queue.offer(request)) {
+      System.out.println("offer failed");
       // noop;
     }
-
+    
+    notifyAcquisition();
+  }
+  
+  protected void notifyAcquisition() {
     synchronized (MONITOR) {
       if (isWaiting) {
         MONITOR.notifyAll();
+        System.out.println("notify all");
       }
-    }
+    }    
   }
 
-  private FetchAndLockResult tryFetchAndLock(FetchAndLockRequest request) {
+  protected FetchAndLockResult tryFetchAndLock(FetchAndLockRequest request) {
     ProcessEngine processEngine = request.getProcessEngine();
     IdentityService identityService = processEngine.getIdentityService();
 
@@ -179,7 +208,7 @@ public class FetchAndLockHandlerImpl implements Runnable, FetchAndLockHandler {
     return result;
   }
 
-  private List<LockedExternalTaskDto> executeFetchAndLock(FetchExternalTasksExtendedDto fetchingDto, ProcessEngine processEngine) {
+  protected List<LockedExternalTaskDto> executeFetchAndLock(FetchExternalTasksExtendedDto fetchingDto, ProcessEngine processEngine) {
     ExternalTaskQueryBuilder fetchBuilder = processEngine
       .getExternalTaskService()
       .fetchAndLock(fetchingDto.getMaxTasks(), fetchingDto.getWorkerId(), fetchingDto.isUsePriority());
@@ -213,12 +242,12 @@ public class FetchAndLockHandlerImpl implements Runnable, FetchAndLockHandler {
     return LockedExternalTaskDto.fromLockedExternalTasks(externalTasks);
   }
 
-  private void invalidRequest(AsyncResponse asyncResponse, String message) {
+  protected void invalidRequest(AsyncResponse asyncResponse, String message) {
     InvalidRequestException invalidRequestException = new InvalidRequestException(Status.BAD_REQUEST, message);
     asyncResponse.resume(invalidRequestException);
   }
 
-  private void handleProcessEngineException(FetchAndLockRequest request, ProcessEngineException exception) {
+  protected void handleProcessEngineException(FetchAndLockRequest request, ProcessEngineException exception) {
     AsyncResponse asyncResponse = request.getAsyncResponse();
     pendingRequests.remove(request);
     asyncResponse.resume(exception);
@@ -266,6 +295,15 @@ public class FetchAndLockHandlerImpl implements Runnable, FetchAndLockHandler {
 
   public List<FetchAndLockRequest> getPendingRequests() {
     return pendingRequests;
+  }
+  
+  public boolean hasPendingRequests() {
+    int size = 0;
+    synchronized (pendingRequests) {
+      size = pendingRequests.size();
+    }
+    
+    return size > 0;
   }
 
 }
