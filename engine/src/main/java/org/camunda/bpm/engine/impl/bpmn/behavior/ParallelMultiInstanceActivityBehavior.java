@@ -71,7 +71,7 @@ public class ParallelMultiInstanceActivityBehavior extends MultiInstanceActivity
   }
 
   @Override
-  public void concurrentChildExecutionEnded(ActivityExecution scopeExecution, ActivityExecution endedExecution) {
+  public synchronized void concurrentChildExecutionEnded(ActivityExecution scopeExecution, ActivityExecution endedExecution) {
 
     int nrOfCompletedInstances = getLoopVariable(scopeExecution, NUMBER_OF_COMPLETED_INSTANCES) + 1;
     setLoopVariable(scopeExecution, NUMBER_OF_COMPLETED_INSTANCES, nrOfCompletedInstances);
